@@ -1,5 +1,5 @@
 package com.gigjamgo.azure_blob_flutter
-
+import kotlinx.coroutines.*
 import android.util.Log
 import com.azure.core.util.Context
 import com.azure.storage.blob.BlobServiceClientBuilder
@@ -37,21 +37,23 @@ class AzureBlobFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 val blobVideoContainerName = call.argument<String?>("blobVideoContainerName")
                 val blobImageContainerName = call.argument<String?>("blobImageContainerName")
                 val sasToken = call.argument<String?>("sasToken")
-                val response =  uploadToAzure(
-                    filePath,
-                    fileName,
-                    isVideo,
-                    blobBaseUrl,
-                    blobVideoContainerName,
-                    blobImageContainerName,
-                    sasToken
-                )
-                if (response.second) {
-                    result.success(
-                        response.first
+                CoroutineScope(Dispatchers.IO).launch {
+                    val response = uploadToAzure(
+                        filePath,
+                        fileName,
+                        isVideo,
+                        blobBaseUrl,
+                        blobVideoContainerName,
+                        blobImageContainerName,
+                        sasToken
                     )
-                } else {
-                   result.error(response.first,"","")
+                    withContext(Dispatchers.Main) {
+                        if (response.second) {
+                            result.success(response.first)
+                        } else {
+                            result.error(response.first, "", "")
+                        }
+                    }
                 }
 
             }
@@ -63,8 +65,8 @@ class AzureBlobFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 val blobVideoContainerName = call.argument<String?>("blobVideoContainerName")
                 val blobImageContainerName = call.argument<String?>("blobImageContainerName")
                 val sasToken = call.argument<String?>("sasToken")
-                result.success(
-                    delete(
+                CoroutineScope(Dispatchers.IO).launch {
+                    val deleteResponse = delete(
                         blobName,
                         isVideo,
                         blobBaseUrl,
@@ -72,7 +74,10 @@ class AzureBlobFlutterPlugin : FlutterPlugin, MethodCallHandler {
                         blobImageContainerName,
                         sasToken
                     )
-                )
+                    withContext(Dispatchers.Main) {
+                        result.success(deleteResponse)
+                    }
+                }
             }
 
             else -> {
@@ -85,7 +90,7 @@ class AzureBlobFlutterPlugin : FlutterPlugin, MethodCallHandler {
         channel.setMethodCallHandler(null)
     }
 
-    private fun uploadToAzure(
+    suspend fun uploadToAzure(
         path: String?,
         fileName: String?,
         isVideo: Boolean?,
@@ -94,48 +99,50 @@ class AzureBlobFlutterPlugin : FlutterPlugin, MethodCallHandler {
         blobImageContainerName: String?,
         sasToken: String?
     ): Pair<String, Boolean> {
-        if (path == null) {
-            return Pair("Path is null", false)
-        }
-        val endpoint = "${blobBaseUrl}?${sasToken}"
-        val blobServiceClient = BlobServiceClientBuilder()
-            .endpoint(endpoint)
-            .buildClient()
-
-        // Extract the container name and blob name from the SAS URL
-        val containerName = if (isVideo == true) blobVideoContainerName else blobImageContainerName
-        val blobName =
-            fileName?.split(".")?.first() + System.currentTimeMillis() + "." + fileName?.split(".")
-                ?.last()
-
-        // Get a reference to the container and blob
-        val containerClient = blobServiceClient.getBlobContainerClient(containerName)
-        val blobClient = containerClient.getBlobClient(blobName)
-
-        // Upload the file
-        try {
-            val file = File(path)
-            val response = blobClient.uploadFromFileWithResponse(
-                BlobUploadFromFileOptions(file.path)
-                   ,
-                Duration.ofMinutes(5),
-                Context("", "")
-            )
-            if (response.statusCode == 201) {
-                return Pair(blobName, true)
-            } else {
-                return Pair("Upload failed", false)
+        return  try {
+            if (path == null) {
+                return Pair("Path is null", false)
             }
+            val endpoint = "${blobBaseUrl}?${sasToken}"
+            val blobServiceClient = BlobServiceClientBuilder()
+                .endpoint(endpoint)
+                .buildClient()
 
+            // Extract the container name and blob name from the SAS URL
+            val containerName = if (isVideo == true) blobVideoContainerName else blobImageContainerName
+            val blobName =
+                fileName?.split(".")?.first() + System.currentTimeMillis() + "." + fileName?.split(".")
+                    ?.last()
+
+            // Get a reference to the container and blob
+            val containerClient = blobServiceClient.getBlobContainerClient(containerName)
+            val blobClient = containerClient.getBlobClient(blobName)
+
+            // Upload the file
+            val file = File(path)
+            withContext(Dispatchers.IO) {
+                val response = blobClient.uploadFromFileWithResponse(
+                    BlobUploadFromFileOptions(file.path),
+                    Duration.ofMinutes(5),
+                    Context("", "")
+                )
+
+                if (response.statusCode == 201) {
+                    Pair(blobName, true)
+                } else {
+                    Pair("Upload failed", false)
+                }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
-            return Pair(e.localizedMessage?:e.toString(), false)
+            Pair(e.localizedMessage ?: e.toString(), false)
         }
-
 
     }
 
-    private fun delete(
+
+
+    suspend fun delete(
         blobName: String?,
         isVideo: Boolean?,
         blobBaseUrl: String?,
@@ -155,11 +162,14 @@ class AzureBlobFlutterPlugin : FlutterPlugin, MethodCallHandler {
         val blobClient = containerClient.getBlobClient(blobName)
 
         // Upload the file
-        try {
-            blobClient.delete()
-        } catch (e: Exception) {
-            e.printStackTrace()
+        return withContext(Dispatchers.IO) {
+            try {
+                blobClient.delete()
+                "Deleted"
+            } catch (e: Exception) {
+                e.printStackTrace()
+                "Failed to delete"
+            }
         }
-        return "Deleted"
     }
 }
