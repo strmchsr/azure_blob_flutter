@@ -1,34 +1,72 @@
+# Azure Blob Flutter
 
-# Azure Blob Flutter Package
+A Flutter plugin for uploading and deleting files from Microsoft Azure Blob Storage.
 
-The azure_blob_flutter package provides a convenient and simple way to upload images and delete blobs from Azure Blob Storage in a Flutter application. It is designed to work seamlessly with Azure Blob Storage and aims to simplify common tasks associated with managing blobs.
+## Features
 
+- Upload files to Azure Blob Storage.
+- Delete files from Azure Blob Storage.
+- Support for both Android and iOS.
 
 ## Installation
 
-Install my-project with npm
+Add the following to your `pubspec.yaml` file:
 
-```bash
- dependencies:
-  azure_blob_flutter: ^0.0.5
+```yaml
+dependencies:
+  azure_blob_flutter: ^0.0.10
 ```
 
-## Usage/Examples
+Then run `flutter pub get`.
 
-```javascript
-final _azureBlobFlutterPlugin = AzureBlobFlutter("blobBaseUrl",
-      "blobVideoContainerName",
-      "blobImageContainerName");
+## Usage
 
- await _azureBlobFlutterPlugin.uploadImage("path", "fileName",
-              "sasTokenUrl", false);
+Import the package in your Dart file:
 
- await _azureBlobFlutterPlugin.delete("blobName",
-              "sasTokenUrl", false);             
+```dart
+import 'package:azure_blob_flutter/azure_blob_flutter.dart';
 ```
 
+Initialize the plugin:
+
+```dart
+final _azureBlobFlutter = AzureBlobFlutter(
+  'YOUR_BLOB_BASE_URL',
+  'YOUR_VIDEO_CONTAINER_NAME',
+  'YOUR_IMAGE_CONTAINER_NAME'
+);
+```
+
+### Upload a File
+
+```dart
+Future<void> upload(String filePath, String fileName, String sasToken, bool isVideo) async {
+  try {
+    String? blobUrl = await _azureBlobFlutter.uploadImage(
+        filePath, fileName, sasToken, isVideo);
+    print('Uploaded: $blobUrl');
+  } catch (e) {
+    print(e);
+  }
+}
+```
+
+### Delete a File
+
+```dart
+Future<void> delete(String blobName, String sasToken, bool isVideo) async {
+  try {
+    await _azureBlobFlutter.delete(blobName, sasToken, isVideo);
+    print('Delete request sent for $blobName.');
+  } catch (e) {
+    print(e);
+  }
+}
+```
+*Note: The delete functionality on iOS is not fully implemented.*
 
 ## License
-This package is licensed under the MIT License - see the [LICENCE](https://pub.dev/packages/azure_blob_flutter/license) file for details.
+
+This package is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 
